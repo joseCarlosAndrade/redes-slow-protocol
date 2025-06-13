@@ -15,3 +15,17 @@ modulo (nao modulo como biblioteco) :
 implementar janela deslizante
 
 fragmentaçao para maiores que 1456 bytes
+
+## how to use it
+
+Compile! (have g++ at least 8)
+
+```bash
+make all
+```
+
+Run
+
+```bash
+./bin/app
+```
