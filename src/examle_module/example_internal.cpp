@@ -12,3 +12,4 @@ void internal_print(const std::string& message) {
 void public_print(const std::string& message) {
     internal_print(message);
 }
+
