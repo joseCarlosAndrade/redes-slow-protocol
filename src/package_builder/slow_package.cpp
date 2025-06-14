@@ -117,6 +117,8 @@ SlowPackage* SlowPackage::deserialize(std::vector<std::byte> data) {
     if (data.size() > 32) {
         pkg->data.insert(pkg->data.end(), data.begin() + 32, data.end());
     }
+
+    
     return pkg;
 }
 std::string SlowPackage::toString() {

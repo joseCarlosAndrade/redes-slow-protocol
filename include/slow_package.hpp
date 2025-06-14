@@ -1,5 +1,4 @@
-#ifndef SLOW_PACKAGE_H
-#define SLOW_PACKAGE_H
+#pragma once
 #include <string>
 #include <stdint.h>
 #include <cstddef>
@@ -15,7 +14,9 @@ class SlowPackage {
           CONNECT, 
           SETUP,
           DATA,
-          ACK
+          ACK,
+          DISCONNECT,
+          REVIVE
         };
       // Data fields, check project specification for more information
       std::array<std::byte, 16> sid;
@@ -41,5 +42,3 @@ class SlowPackage {
       std::string toString(); // For debugging purposes
 };
 
-
-#endif // SLOW_PACKAGE_H
