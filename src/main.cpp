@@ -1,9 +1,12 @@
-#include "example.hpp"
-#include "class_logger.hpp"
+#include <iostream>
 
 int main() {
-    public_print(std::string("this is a print!"));
+    std::cout << "Starting SLOW client" << std::endl;
 
-    Logger l;
-    l.class_logging(std::string("this is another log! but from the class"));
+    // loop that receives input to to allow functions:
+    // connect
+    // send data
+    // disconnect
+
+    return 0;
 }
