@@ -1,11 +1,16 @@
 #include "transaction.hpp"
-#include"logger.hpp"
-#include<thread>
+#include "logger.hpp"
+#include <thread>
 
 #define N_RETRIES 10
+#define AWAIT_TIME_MS 10
 
 Transaction::Transaction(Client client) {
     this->client = &client;
+    
+    this->connection_status_mtx.lock();
+    this->connection_status = ConnectionStatus::OFFLINE;
+    this->connection_status_mtx.unlock();
 }
 
 Transaction::~Transaction() {
@@ -13,11 +18,23 @@ Transaction::~Transaction() {
 }
 
 bool Transaction::connection_still_alive() {
-    return (std::chrono::steady_clock::now() < this->session_expiration);
+    if (std::chrono::steady_clock::now() < this->session_expiration) {
+        return true;
+    }
+    this->connection_status_mtx.lock();
+    this->connection_status = ConnectionStatus::EXPIRED;
+    this->connection_status_mtx.unlock();
+
+    return false;
 }
 
 bool Transaction::connect() {
     Log(LogLevel::INFO, "requesting connection");
+
+    if (this->connection_still_alive()) {
+        Log(LogLevel::INFO, "connection already established. Skipping..");
+        return true;
+    }
 
     // send connect package
     int current_seq = 0;
@@ -39,7 +56,7 @@ bool Transaction::connect() {
         }
 
         // if it doesnt find, sleep for 100 ms and try again for N_RETRIES
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(AWAIT_TIME_MS));
     }
     
     if (!found) {
@@ -71,25 +88,78 @@ bool Transaction::connect() {
     std::chrono::milliseconds  ttl_duration(received_sttl); // converting to milliseconds
 
     this->session_expiration = std::chrono::steady_clock::now() + ttl_duration;
+    
+    this->connection_status_mtx.lock();
+    this->connection_status = ConnectionStatus::CONNECTED;
+    this->connection_status_mtx.unlock();
+
+    // spawns the listener thread
+    this->listener_thread = std::thread(&Transaction::listen_to_incoming_data, this);
+
     return true;
 }
 
-bool Transaction::send_data(std::string data, bool revive) {
-    Log(LogLevel::INFO, "sending data: '" + data + "'");
+bool Transaction::send_data(std::string data, bool revive, int attempts_left = 5) {
+    Log(LogLevel::INFO, "sending data: '" + data + "'. Attempts left: " + std::to_string(attempts_left));
+
+    if (this->connection_status != ConnectionStatus::CONNECTED) {
+        Log(LogLevel::ERROR, "failed to send data: not connected.");
+        return false;
+    }
 
     // for now, limit the data size to 1440 bytes (1472 - 32 bytes from header)
     // TODO : implement fragmentation
     // TODO : implement window
 
+    int seqnum = this->current_seqnum;
+
+    SlowPackage package_data; // to be implemented
+    package_data.seqnum = seqnum;
+    if (revive) package_data.revive = true;
+    this->client->send_data(package_data);
+
+    SlowPackage ack_data;
+    bool found = false;
+    int retries = N_RETRIES;
+
+    while (retries-- > 0) {
+        if (this->check_buffer_for_data(PackageType::ACK, seqnum, &ack_data)) {
+            found = true;
+            break;
+        } 
+        std::this_thread::sleep_for(std::chrono::milliseconds(AWAIT_TIME_MS));
+    }
+
+    if (!found) {
+        if (attempts_left <= 0) {
+            Log(LogLevel::ERROR, "attempts exhausted. No ack received from server. Giving up");
+            return false;
+        }
+
+        // attempts to resend the data up to attempts_left times
+        Log(LogLevel::ERROR, "did not receive ack from server. Retrying..  Attempts left: " + std::to_string(attempts_left));
+        return this->send_data(data, revive, --attempts_left);
+    }
+
+    Log(LogLevel::INFO, "ack received for data. Data successfully sent");
+
+    // updating curernt seqnum accordingly
+    this->current_seqnum = ack_data.seqnum;
+    
+    return true;
     // complicated stuff to develop
 }
 
 bool Transaction::disconnect() {
     Log(LogLevel::INFO, "requesting disconnect");
 
+    this->connection_status_mtx.lock();
+    this->connection_status = ConnectionStatus::OFFLINE; // no matter if its successful or not, disconect
+    this->connection_status_mtx.lock();
+
     int seqnum = this->current_seqnum;
 
-    SlowPackage disconnect_package; // to be implement
+    SlowPackage disconnect_package; // to be implemented
     disconnect_package.seqnum = seqnum;
     this->client->send_data(disconnect_package);
 
@@ -105,7 +175,7 @@ bool Transaction::disconnect() {
         }
 
         // if it doesnt find, sleep for 100 ms and try again for N_RETRIES
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(AWAIT_TIME_MS));
     }
     
     if (!found) {
@@ -141,4 +211,20 @@ bool Transaction::check_buffer_for_data(PackageType type, uint32_t acknum, SlowP
     this->buffer_mtx.unlock();
 
     return false;
+}
+
+void Transaction::listen_to_incoming_data() {
+    for (;;) {
+        std::lock_guard<std::mutex> lock(this->connection_status_mtx); // locking connection status variable
+        if (this->connection_status != ConnectionStatus::CONNECTED) {
+             
+            break;
+        } // exists once the connection is over
+    
+        SlowPackage package = this->client->receive_data();
+
+        this->buffer_mtx.lock();
+        this->receiver_buffer.emplace_back(package);
+        this->buffer_mtx.unlock();
+    }
 }
