@@ -1,7 +1,6 @@
-#include "example.hpp"
-#include "class_logger.hpp"
 #include <iostream>
-#include "../include/slow_package.hpp"
+#include <cstddef>
+#include "slow_package.hpp"
 
 int main() {
     // Example usage of SlowPackage
