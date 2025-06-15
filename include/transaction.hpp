@@ -5,8 +5,9 @@
 #include <iostream>
 #include <mutex>
 #include<vector>
+#include<thread>
 
-// placeholders (DELETE WHEN IMPLEMENTED)
+// placeholders (DELETE WHEN IMPLEMENTED) - WONT COMPILE YET BC THEYLL BE IMPLEMENTED
 enum class PackageType {CONNECT, SETUP, ACK, ACCEPT_REJECT, MORE_BITS};
 
 class SlowPackage {

@@ -7,7 +7,7 @@
 
 Transaction::Transaction(Client client) {
     this->client = &client;
-    
+
     this->connection_status_mtx.lock();
     this->connection_status = ConnectionStatus::OFFLINE;
     this->connection_status_mtx.unlock();
@@ -99,7 +99,7 @@ bool Transaction::connect() {
     return true;
 }
 
-bool Transaction::send_data(std::string data, bool revive, int attempts_left = 5) {
+bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     Log(LogLevel::INFO, "sending data: '" + data + "'. Attempts left: " + std::to_string(attempts_left));
 
     if (this->connection_status != ConnectionStatus::CONNECTED) {
