@@ -43,7 +43,7 @@
 
 // -------------------------
 
-enum class ConnectionStatus {OFFLINE, CONNECTED, EXPIRED};
+enum class ConnectionStatus {OFFLINE, CONNECTED, EXPIRED, CONNECTING};
 class Transaction {
     public:
         Transaction(UdpClient* client);
@@ -75,6 +75,7 @@ class Transaction {
         std::chrono::time_point<std::chrono::steady_clock> session_expiration;
 
         uint32_t current_seqnum; // package number
+        uint32_t cuirrent_sttl;
 
         std::vector<SlowPackage> receiver_buffer; // keeps everything received from the server
         std::mutex buffer_mtx;

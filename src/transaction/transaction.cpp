@@ -2,6 +2,7 @@
 #include "logger.hpp"
 #include <thread>
 #include "udp_client.hpp"
+#include<string>
 
 #define N_RETRIES 10
 #define AWAIT_TIME_MS 10
@@ -21,12 +22,17 @@ Transaction::Transaction(UdpClient *client) {
 
 Transaction::~Transaction() {
     this->client = nullptr;
+
+    
 }
 
 bool Transaction::connection_still_alive() {
     if (std::chrono::steady_clock::now() < this->session_expiration) {
         return true;
     }
+
+    Log(LogLevel::WARNING, "SESSION EXPIRED");
+
     this->connection_status_mtx.lock();
     this->connection_status = ConnectionStatus::EXPIRED;
     this->connection_status_mtx.unlock();
@@ -37,13 +43,17 @@ bool Transaction::connection_still_alive() {
 bool Transaction::connect() {
     Log(LogLevel::INFO, "requesting connection");
 
+    this->connection_status = ConnectionStatus::CONNECTING; 
+    // spawns the listener thread
+    this->listener_thread = std::thread(&Transaction::listen_to_incoming_data, this);
+
     if (this->connection_still_alive()) {
         Log(LogLevel::INFO, "connection already established. Skipping..");
         return true;
     }
 
     // send connect package
-    int current_seq = 0;
+    // int current_seq = 0;
 
     // SlowPackage connect_package; //create connection package
     // connect_package.seqnum = current_seq;
@@ -112,14 +122,15 @@ bool Transaction::connect() {
     // save session data
     this->session_uuid = setup_data.sid; // TODO: check on how it will be implemented
     this->current_seqnum = setup_data.seqnum;
-
+    this->cuirrent_sttl = setup_data.sttl;
     // set session expiration
     const uint32_t MAX_27BIT = 0x7FFFFFF;
 
     // (mask duration to 27 bits)
     auto received_sttl = setup_data.sttl & MAX_27BIT;
+    
 
-    std::chrono::milliseconds  ttl_duration(received_sttl); // converting to milliseconds
+    std::chrono::milliseconds ttl_duration(received_sttl); // converting to milliseconds
 
     this->session_expiration = std::chrono::steady_clock::now() + ttl_duration;
     
@@ -127,8 +138,7 @@ bool Transaction::connect() {
     this->connection_status = ConnectionStatus::CONNECTED;
     this->connection_status_mtx.unlock();
 
-    // spawns the listener thread
-    this->listener_thread = std::thread(&Transaction::listen_to_incoming_data, this);
+
 
     return true;
 }
@@ -148,7 +158,14 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     int seqnum = this->current_seqnum;
 
     SlowPackage package_data; // to be implemented
+   
+    package_data.sid = this->session_uuid;
+    package_data.sttl = this->cuirrent_sttl;
+    package_data.flag_ack = false; // TODO: the specification requests for this flag to be set to 1, but it doenst work
     package_data.seqnum = seqnum;
+    package_data.window = 256;
+
+
     if (revive) package_data.flag_revive = true;
 
     auto package_bytes = package_data.serialize();
@@ -196,19 +213,26 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     this->current_seqnum = ack_data.seqnum;
     
     return true;
-    // complicated stuff to develop
+
+    // (complicated stuff here to develop later)
 }
 
 bool Transaction::disconnect() {
     Log(LogLevel::INFO, "requesting disconnect");
 
     this->connection_status_mtx.lock();
-    this->connection_status = ConnectionStatus::OFFLINE; // no matter if its successful or not, disconect
+    this->connection_status = ConnectionStatus::OFFLINE; // no matter if its successful or not, disconnect
     this->connection_status_mtx.lock();
-
+    
     int seqnum = this->current_seqnum;
 
     SlowPackage disconnect_package; // to be implemented
+    disconnect_package.sid = this->session_uuid;
+    disconnect_package.sttl = this->cuirrent_sttl;
+    disconnect_package.flag_ack = true;
+    disconnect_package.flag_connect = true;
+    disconnect_package.flag_revive = true;
+    disconnect_package.acknum = 0; // TODO fix this
     disconnect_package.seqnum = seqnum;
 
     auto package_bytes = disconnect_package.serialize();
@@ -265,15 +289,26 @@ bool Transaction::check_buffer_for_data(SlowPackage::PackageType type, uint32_t 
 }
 
 void Transaction::listen_to_incoming_data() {
+    Log(LogLevel::INFO, "listening to incomming messages from server..");
+
     for (;;) {
-        std::lock_guard<std::mutex> lock(this->connection_status_mtx); // locking connection status variable
-        if (this->connection_status != ConnectionStatus::CONNECTED) {
-             
+        // this->connection_status_mtx.lock();
+        if (this->connection_status != ConnectionStatus::CONNECTED && this->connection_status != ConnectionStatus::CONNECTING) {
+            // this->connection_status_mtx.unlock();
+            Log(LogLevel::WARNING, "status is not connected. not listening to messages from server anymore.");
+            
+            int a = static_cast<int>(this->connection_status);
+
+            Log(LogLevel::WARNING, "status: " + std::to_string(a));
+
             break;
         } // exists once the connection is over
+        // this->connection_status_mtx.unlock(); 
 
         // raw bytes
         auto data = this->client->receive_bytes();
+
+        Log(LogLevel::INFO, "received a package from server");
 
         // deserializing into SlowPackage
         auto package = SlowPackage::deserialize(data);

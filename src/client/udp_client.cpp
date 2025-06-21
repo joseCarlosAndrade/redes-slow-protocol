@@ -121,7 +121,7 @@ std::vector<char> UdpClient::receive_chars(int buffer_size) {
 }
 
 
-std::vector<std::byte> UdpClient::receive_bytes(int buffer_size = 1472) {
+std::vector<std::byte> UdpClient::receive_bytes(int buffer_size) {
         if (!is_connected) {
         std::cerr << "Erro: Socket nao conectado." << std::endl;
         return {};
