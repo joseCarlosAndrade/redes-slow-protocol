@@ -15,7 +15,8 @@ class SlowPackage {
           CONNECT, 
           SETUP,
           DATA,
-          ACK
+          ACK,
+          RAW // no data, default
         };
       // Data fields, check project specification for more information
       std::array<std::byte, 16> sid;

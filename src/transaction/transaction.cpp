@@ -1,12 +1,18 @@
 #include "transaction.hpp"
 #include "logger.hpp"
 #include <thread>
+#include "udp_client.hpp"
 
 #define N_RETRIES 10
 #define AWAIT_TIME_MS 10
 
-Transaction::Transaction(Client client) {
-    this->client = &client;
+Transaction::Transaction(UdpClient *client) {
+    if  (client == nullptr) {
+        Log(LogLevel::ERROR, "client is null");
+        exit(EXIT_FAILURE);
+    }
+
+    this->client = client;
 
     this->connection_status_mtx.lock();
     this->connection_status = ConnectionStatus::OFFLINE;
@@ -39,9 +45,39 @@ bool Transaction::connect() {
     // send connect package
     int current_seq = 0;
 
-    SlowPackage connect_package; //create connection package
-    connect_package.seqnum = current_seq;
-    this->client->send_data(connect_package);
+    // SlowPackage connect_package; //create connection package
+    // connect_package.seqnum = current_seq;
+    // this->client->send_data(connect_package);
+    SlowPackage connect_package;
+    connect_package.sid = {};
+    connect_package.sttl = 0;
+    connect_package.flag_connect = true;
+    connect_package.seqnum = 0;
+    connect_package.acknum = 0;
+    connect_package.window = 256;
+    connect_package.fid = 0;
+    connect_package.fo = 0;
+    // data is not initialized
+    // this->client->send()
+
+    // serializing
+    auto data_bytes = connect_package.serialize();
+
+    bool sent = false;
+    // tries to send it 5 times
+    for (int i = 0; i < 5; i++) {
+        if (this->client->send_bytes(data_bytes)) {
+            sent = true;
+            break;
+        }
+    }
+
+    if (!sent) {
+        Log(LogLevel::ERROR, "error sending connect package. Cancelling");
+        return false;
+    }
+
+    Log(LogLevel::INFO, "connect package sent successfully");
 
     // receive setup data (containing sesstion and stuff)
     SlowPackage setup_data;
@@ -50,7 +86,7 @@ bool Transaction::connect() {
 
     while (retries-- > 0) {
         // if it finds, exit while
-        if(this->check_buffer_for_data(PackageType::SETUP, 0, &setup_data)) {
+        if(this->check_buffer_for_data(SlowPackage::SETUP, 0, &setup_data)) {
             found = true;
             break;
         }
@@ -67,22 +103,20 @@ bool Transaction::connect() {
 
     // found a setup, but it may be rejected
 
-    if (!setup_data.accepted_rejected) {
+    if (!setup_data.flag_accept_reject) {
         Log(LogLevel::WARNING, "connection rejected by server");
         return false;
     } 
 
     Log(LogLevel::INFO, "received setup response from server. Connection accepted");
     // save session data
-    this->session_uuid = setup_data.uuid; // TODO: check on how it will be implemented
-    this->session_ip = setup_data.ip;
-    this->session_port = setup_data.port;
+    this->session_uuid = setup_data.sid; // TODO: check on how it will be implemented
     this->current_seqnum = setup_data.seqnum;
 
     // set session expiration
     const uint32_t MAX_27BIT = 0x7FFFFFF;
 
-    // (mask to 27 bits)
+    // (mask duration to 27 bits)
     auto received_sttl = setup_data.sttl & MAX_27BIT;
 
     std::chrono::milliseconds  ttl_duration(received_sttl); // converting to milliseconds
@@ -115,15 +149,30 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
 
     SlowPackage package_data; // to be implemented
     package_data.seqnum = seqnum;
-    if (revive) package_data.revive = true;
-    this->client->send_data(package_data);
+    if (revive) package_data.flag_revive = true;
+
+    auto package_bytes = package_data.serialize();
+    
+    bool sent = false;
+
+    for (int i = 0; i <5 ; i++ ) {
+        if (this->client->send_bytes(package_bytes)) {
+            sent = true;
+            break;
+        }
+    }
+
+    if (!sent) {
+        Log(LogLevel::ERROR, "could not send data package. Cancelling");
+        return false;
+    }
 
     SlowPackage ack_data;
     bool found = false;
     int retries = N_RETRIES;
 
     while (retries-- > 0) {
-        if (this->check_buffer_for_data(PackageType::ACK, seqnum, &ack_data)) {
+        if (this->check_buffer_for_data(SlowPackage::ACK, seqnum, &ack_data)) {
             found = true;
             break;
         } 
@@ -161,7 +210,9 @@ bool Transaction::disconnect() {
 
     SlowPackage disconnect_package; // to be implemented
     disconnect_package.seqnum = seqnum;
-    this->client->send_data(disconnect_package);
+
+    auto package_bytes = disconnect_package.serialize();
+    this->client->send_bytes(package_bytes);
 
     SlowPackage response;
     bool found = false;
@@ -169,7 +220,7 @@ bool Transaction::disconnect() {
 
     while (retries-- > 0) {
         // if it finds, exit while
-        if(this->check_buffer_for_data(PackageType::ACK, seqnum, &response)) {
+        if(this->check_buffer_for_data(SlowPackage::ACK, seqnum, &response)) {
             found = true;
             break;
         }
@@ -188,7 +239,7 @@ bool Transaction::disconnect() {
     return false;
 }
 
-bool Transaction::check_buffer_for_data(PackageType type, uint32_t acknum, SlowPackage* package) {
+bool Transaction::check_buffer_for_data(SlowPackage::PackageType type, uint32_t acknum, SlowPackage* package) {
 
     this->buffer_mtx.lock();
     
@@ -220,11 +271,15 @@ void Transaction::listen_to_incoming_data() {
              
             break;
         } // exists once the connection is over
-    
-        SlowPackage package = this->client->receive_data();
+
+        // raw bytes
+        auto data = this->client->receive_bytes();
+
+        // deserializing into SlowPackage
+        auto package = SlowPackage::deserialize(data);
 
         this->buffer_mtx.lock();
-        this->receiver_buffer.emplace_back(package);
+        this->receiver_buffer.emplace_back(*package);
         this->buffer_mtx.unlock();
     }
 }

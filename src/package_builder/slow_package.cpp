@@ -7,6 +7,25 @@
 #include <cstdint>
 SlowPackage::SlowPackage() {
     // Initialize members with default values if needed
+
+    // setting all defaul sid to 0
+    this->sid.fill(std::byte{0});
+
+    this->sttl = 0;
+
+    this->flag_connect = false;
+    this->flag_revive = false;
+    this->flag_ack = false;
+    this->flag_accept_reject = false;
+    this->flag_mb = false;
+    this->seqnum = 0;
+    this->acknum = 0;
+    this->window = 0;
+    this->fid = 0;
+    this->fo = 0;
+    // data does not need allocation, its an empty vector
+
+    this->type = SlowPackage::RAW;
 }
 
 SlowPackage::~SlowPackage() {

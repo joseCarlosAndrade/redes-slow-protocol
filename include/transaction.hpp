@@ -6,45 +6,47 @@
 #include <mutex>
 #include<vector>
 #include<thread>
+#include "udp_client.hpp"
+#include "slow_package.hpp"
 
 // placeholders (DELETE WHEN IMPLEMENTED) - WONT COMPILE YET BC THEYLL BE IMPLEMENTED
-enum class PackageType {CONNECT, SETUP, ACK, ACCEPT_REJECT, MORE_BITS};
+// enum class PackageType {CONNECT, SETUP, ACK, ACCEPT_REJECT, MORE_BITS};
 
-class SlowPackage {
+// class SlowPackage {
 
-    public: 
+//     public: 
 
-        SlowPackage();
-        ~SlowPackage();
-        // std::string serialize();
-        // static SlowPackage deserialize(std::byte data, size_t size);
-        std::string uuid;
-        std::string ip;
-        int port;
-        uint32_t sttl;
-        bool accepted_rejected;
-        uint32_t seqnum;
-        uint32_t acknum;
-        PackageType type;
-        bool revive;
+//         SlowPackage();
+//         ~SlowPackage();
+//         // std::string serialize();
+//         // static SlowPackage deserialize(std::byte data, size_t size);
+//         std::string uuid;
+//         std::string ip;
+//         int port;
+//         uint32_t sttl;
+//         bool accepted_rejected;
+//         uint32_t seqnum;
+//         uint32_t acknum;
+//         PackageType type;
+//         bool revive;
         
-};
+// };
 
-class Client {
-    public:
-        Client();
+// class Client {
+//     public:
+//         Client();
          
-        ~Client();
-        void send_data(SlowPackage package);
-        SlowPackage receive_data();
-};
+//         ~Client();
+//         void send_data(SlowPackage package);
+//         SlowPackage receive_data();
+// };
 
 // -------------------------
 
 enum class ConnectionStatus {OFFLINE, CONNECTED, EXPIRED};
 class Transaction {
     public:
-        Transaction(Client client);
+        Transaction(UdpClient* client);
         ~Transaction();
 
         // transaction functions
@@ -64,8 +66,8 @@ class Transaction {
         ConnectionStatus connection_status;
 
     private:
-        Client *client;
-        std::string session_uuid; // 16 bytes
+        UdpClient *client;
+        std::array<std::byte, 16> session_uuid; // 16 bytes
         std::string session_ip; // bytes 
         int session_port;
 
@@ -80,7 +82,7 @@ class Transaction {
 
         // checks the buffer (thread safe) for a specific acknum and type package;
         // if it finds, returns true, removes the package from the buffer and sets package to the found value
-        bool check_buffer_for_data(PackageType type, uint32_t acknum, SlowPackage* package);
+        bool check_buffer_for_data(SlowPackage::PackageType type, uint32_t acknum, SlowPackage* package);
 
         std::thread listener_thread;
         void listen_to_incoming_data();
