@@ -1,6 +1,6 @@
 # Compiler and flags
 CXX := g++
-CXXFLAGS := -std=c++2a -Wall -Wextra -Iinclude -I./src # c++2a is the c++20 for the g++ version 8 and 9
+CXXFLAGS := -std=c++2a -Wall -Wextra -Iinclude -I./src -pthread # c++2a is the c++20 for the g++ version 8 and 9
 
 # Directories
 SRC_DIR := src
