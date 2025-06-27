@@ -11,6 +11,10 @@ UdpClient::UdpClient(const std::string& host, int port)
     : host(host), port(port), sockfd(-1), is_connected(false) {
     // Inicializa a estrutura de endereço do servidor com zeros
     memset(&servaddr, 0, sizeof(servaddr));
+    memset(&listening_address, 0, sizeof(listening_address));
+    listening_address.sin_family = AF_INET;
+    listening_address.sin_addr.s_addr = INADDR_ANY;
+    listening_address.sin_port = htons(port);
 }
 
 UdpClient::~UdpClient() {
