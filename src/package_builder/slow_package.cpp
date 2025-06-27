@@ -136,10 +136,24 @@ SlowPackage* SlowPackage::deserialize(std::vector<std::byte> data) {
     if (data.size() > 32) {
         pkg->data.insert(pkg->data.end(), data.begin() + 32, data.end());
     }
-
+    pkg->findPackageType();
     
     return pkg;
 }
+
+SlowPackage::PackageType SlowPackage::findPackageType() {
+    if (!flag_connect && !flag_revive && !flag_ack && !flag_mb) {
+        type = PackageType::SETUP;
+        return type;
+    }
+    if (flag_ack) {
+        type = PackageType::ACK;
+        return type;
+    }
+    type = PackageType::ACK;
+    return type;
+}
+
 std::string SlowPackage::toString() {
     // Implement a string representation of the package for debugging
     std::ostringstream oss;
