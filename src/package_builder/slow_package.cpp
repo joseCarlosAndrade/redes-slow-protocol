@@ -43,20 +43,21 @@ std::vector<std::byte> SlowPackage::serialize() {
     // flag bits (155 - 160), 
     std::vector<std::byte> ttlFlagBytes;
     uint32_t sttlAndFlags = (sttl & 0x07FFFFFF); // 27 bits for sttl
+    sttlAndFlags <<= 5;
     if (flag_connect) {
-        sttlAndFlags |= (1u << 27); // Set bit 27 for flag_connect
+        sttlAndFlags |= (1u << 0); // Set bit 27 for flag_connect
     }
     if (flag_revive) {
-        sttlAndFlags |= (1u << 28); // Set bit 28 for flag_revive
+        sttlAndFlags |= (1u << 1); // Set bit 28 for flag_revive
     }
     if (flag_ack) {
-        sttlAndFlags |= (1u << 29); // Set bit 29 for flag_ack
+        sttlAndFlags |= (1u << 2); // Set bit 29 for flag_ack
     }
     if (flag_accept_reject) {
-        sttlAndFlags |= (1u << 30); // Set bit 30 for flag_accept_reject
+        sttlAndFlags |= (1u << 3); // Set bit 30 for flag_accept_reject
     }
     if (flag_mb) {
-        sttlAndFlags |= (1u << 31); // Set bit 31 for flag_mb
+        sttlAndFlags |= (1u << 4); // Set bit 31 for flag_mb
     }
     // Write as little endian (least significant byte first)
     for (int i = 0; i < 4; ++i) {
