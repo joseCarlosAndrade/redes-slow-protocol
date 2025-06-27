@@ -34,7 +34,7 @@ bool Transaction::connection_still_alive() {
     Log(LogLevel::WARNING, "[transaction] SESSION EXPIRED");
 
     this->connection_status_mtx.lock();
-    // this->connection_status = ConnectionStatus::EXPIRED;
+    // this->connection_status = ConnectionStatus::EXPIRED; // TODO : FIX
     this->connection_status_mtx.unlock();
 
     return false;
@@ -47,10 +47,10 @@ bool Transaction::connect() {
     // spawns the listener thread
     this->listener_thread = std::thread(&Transaction::listen_to_incoming_data, this);
 
-    if (this->connection_still_alive()) {
-        Log(LogLevel::INFO, "connection already established. Skipping..");
-        return true;
-    }
+    // if (this->connection_still_alive()) {
+    //     Log(LogLevel::INFO, "connection already established. Skipping..");
+    //     return true;
+    // }
 
     // send connect package
     // int current_seq = 0;
@@ -309,9 +309,12 @@ void Transaction::listen_to_incoming_data() {
         auto data = this->client->receive_bytes();
 
         Log(LogLevel::INFO, "[transaction] received a package from server");
+        
 
         // deserializing into SlowPackage
         auto package = SlowPackage::deserialize(data);
+
+        Log(LogLevel::INFO, "[transaction] package: " + package->toString());
 
         this->buffer_mtx.lock();
         this->receiver_buffer.emplace_back(*package);
