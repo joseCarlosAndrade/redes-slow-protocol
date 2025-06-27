@@ -53,7 +53,6 @@ SlowPackage disconnectPackage(std::array<std::byte, 16> sid, uint32_t sttl, uint
 std::vector<SlowPackage> fragmentedDataPackages(std::array<std::byte, 16> sid, uint32_t sttl, uint32_t seqnum, 
     uint32_t acknum, uint16_t window, uint8_t fid, std::vector<std::byte> data) {
         uint32_t unsentBytes = data.size();
-        uint32_t seqnumInc = 0;
         uint8_t fo = 0; // Fragment offset
         std::vector<SlowPackage> packages; // Vector to hold the packages
         while (unsentBytes > 1440) {

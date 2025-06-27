@@ -48,17 +48,6 @@ bool Transaction::connect() {
     // spawns the listener thread
     this->listener_thread = std::thread(&Transaction::listen_to_incoming_data, this);
 
-    // if (this->connection_still_alive()) {
-    //     Log(LogLevel::INFO, "connection already established. Skipping..");
-    //     return true;
-    // }
-
-    // send connect package
-    // int current_seq = 0;
-
-    // SlowPackage connect_package; //create connection package
-    // connect_package.seqnum = current_seq;
-    // this->client->send_data(connect_package);
     SlowPackage connect_package;
     connect_package.sid = {};
     connect_package.sttl = 0;
@@ -68,8 +57,6 @@ bool Transaction::connect() {
     connect_package.window = 256;
     connect_package.fid = 0;
     connect_package.fo = 0;
-    // data is not initialized
-    // this->client->send()
 
     // serializing
     auto data_bytes = connect_package.serialize();
@@ -130,7 +117,6 @@ bool Transaction::connect() {
     // (mask duration to 27 bits)
     auto received_sttl = setup_data.sttl & MAX_27BIT;
     
-
     std::chrono::milliseconds ttl_duration(received_sttl); // converting to milliseconds
 
     this->session_expiration = std::chrono::steady_clock::now() + ttl_duration;
@@ -138,8 +124,6 @@ bool Transaction::connect() {
     this->connection_status_mtx.lock();
     this->connection_status = ConnectionStatus::CONNECTED;
     this->connection_status_mtx.unlock();
-
-
 
     return true;
 }
@@ -165,7 +149,6 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     package_data.flag_ack = false; // TODO: the specification requests for this flag to be set to 1, but it doenst work
     package_data.seqnum = seqnum;
     package_data.window = 256;
-
 
     if (revive)  {
         if (!this->connection_still_alive()) {
@@ -244,14 +227,6 @@ bool Transaction::disconnect() {
         seqnum, 
         this->last_acknum
     );
-    // SlowPackage disconnect_package; // to be implemented
-    // disconnect_package.sid = this->session_uuid;
-    // disconnect_package.sttl = this->current_sttl;
-    // disconnect_package.flag_ack = true;
-    // disconnect_package.flag_connect = true;
-    // disconnect_package.flag_revive = true;
-    // disconnect_package.acknum = 0; // TODO fix this
-    // disconnect_package.seqnum = seqnum;
 
     auto package_bytes = disconnect_package.serialize();
     this->client->send_bytes(package_bytes);
@@ -264,7 +239,6 @@ bool Transaction::disconnect() {
         // if it finds, exit while
         if(this->check_buffer_for_data(SlowPackage::ACK, 0, &response)) {
             found = true;
-            // Log(LogLevel::INFO, "[transaction] received ack for disconnect package: " + response.toString());
             break;
         }
 
@@ -315,15 +289,12 @@ void Transaction::listen_to_incoming_data() {
     Log(LogLevel::INFO, "[transaction] listening to incomming messages from server..");
 
     for (;;) {
-        // this->connection_status_mtx.lock();
         if (this->connection_status != ConnectionStatus::CONNECTED 
                 && this->connection_status != ConnectionStatus::CONNECTING) {
-            // this->connection_status_mtx.unlock();
             Log(LogLevel::INFO, "[transaction] [LISTENER THREAD] status is not connected. not listening to messages from server anymore.");
             
             break;
         } // exists once the connection is over
-        // this->connection_status_mtx.unlock(); 
 
         // raw bytes
         auto data = this->client->receive_bytes();
