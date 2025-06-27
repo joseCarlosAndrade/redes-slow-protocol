@@ -9,10 +9,10 @@
 
 
 class SlowPackage {
-     public:
+    public:
       // enum for package types, defined in spcification
       enum PackageType {
-          CONNECT, 
+          CONNECT,
           SETUP,
           DATA,
           ACK,
@@ -41,6 +41,8 @@ class SlowPackage {
       std::vector<std::byte> serialize(); // Serializer
       static SlowPackage* deserialize(std::vector<std::byte> data); // static deserializer
       std::string toString(); // For debugging purposes
+    private:
+        PackageType findPackageType();
 };
 
 
