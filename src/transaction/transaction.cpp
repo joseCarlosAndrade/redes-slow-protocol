@@ -2,6 +2,7 @@
 #include "logger.hpp"
 #include <thread>
 #include "udp_client.hpp"
+#include "package_builder.hpp"
 #include<string>
 
 #define N_RETRIES 10
@@ -122,7 +123,7 @@ bool Transaction::connect() {
     // save session data
     this->session_uuid = setup_data.sid; // TODO: check on how it will be implemented
     this->current_seqnum = setup_data.seqnum;
-    this->cuirrent_sttl = setup_data.sttl;
+    this->current_sttl = setup_data.sttl;
     // set session expiration
     const uint32_t MAX_27BIT = 0x7FFFFFF;
 
@@ -160,7 +161,7 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     SlowPackage package_data; // to be implemented
    
     package_data.sid = this->session_uuid;
-    package_data.sttl = this->cuirrent_sttl;
+    package_data.sttl = this->current_sttl;
     package_data.flag_ack = false; // TODO: the specification requests for this flag to be set to 1, but it doenst work
     package_data.seqnum = seqnum;
     package_data.window = 256;
@@ -220,20 +221,22 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
 bool Transaction::disconnect() {
     Log(LogLevel::INFO, "[transaction] requesting disconnect");
 
-    this->connection_status_mtx.lock();
-    this->connection_status = ConnectionStatus::OFFLINE; // no matter if its successful or not, disconnect
-    this->connection_status_mtx.lock();
-    
     int seqnum = this->current_seqnum;
 
-    SlowPackage disconnect_package; // to be implemented
-    disconnect_package.sid = this->session_uuid;
-    disconnect_package.sttl = this->cuirrent_sttl;
-    disconnect_package.flag_ack = true;
-    disconnect_package.flag_connect = true;
-    disconnect_package.flag_revive = true;
-    disconnect_package.acknum = 0; // TODO fix this
-    disconnect_package.seqnum = seqnum;
+    auto disconnect_package = disconnectPackage(
+        this->session_uuid, 
+        this->current_sttl, 
+        seqnum, 
+        this->last_acknum
+    );
+    // SlowPackage disconnect_package; // to be implemented
+    // disconnect_package.sid = this->session_uuid;
+    // disconnect_package.sttl = this->current_sttl;
+    // disconnect_package.flag_ack = true;
+    // disconnect_package.flag_connect = true;
+    // disconnect_package.flag_revive = true;
+    // disconnect_package.acknum = 0; // TODO fix this
+    // disconnect_package.seqnum = seqnum;
 
     auto package_bytes = disconnect_package.serialize();
     this->client->send_bytes(package_bytes);
@@ -244,8 +247,9 @@ bool Transaction::disconnect() {
 
     while (retries-- > 0) {
         // if it finds, exit while
-        if(this->check_buffer_for_data(SlowPackage::ACK, seqnum, &response)) {
+        if(this->check_buffer_for_data(SlowPackage::ACK, 0, &response)) {
             found = true;
+            // Log(LogLevel::INFO, "[transaction] received ack for disconnect package: " + response.toString());
             break;
         }
 
@@ -259,6 +263,10 @@ bool Transaction::disconnect() {
     }
 
     Log(LogLevel::INFO, "[transaction] ack received. Successfully disconnected");
+
+    this->connection_status_mtx.lock();
+    this->connection_status = ConnectionStatus::OFFLINE; // no matter if its successful or not, disconnect
+    this->connection_status_mtx.unlock();
 
     return false;
 }
@@ -313,6 +321,7 @@ void Transaction::listen_to_incoming_data() {
 
         // deserializing into SlowPackage
         auto package = SlowPackage::deserialize(data);
+        this->last_acknum = package->acknum; // updating last acknum
 
         Log(LogLevel::INFO, "[transaction] package: " + package->toString());
 

@@ -9,39 +9,6 @@
 #include "udp_client.hpp"
 #include "slow_package.hpp"
 
-// placeholders (DELETE WHEN IMPLEMENTED) - WONT COMPILE YET BC THEYLL BE IMPLEMENTED
-// enum class PackageType {CONNECT, SETUP, ACK, ACCEPT_REJECT, MORE_BITS};
-
-// class SlowPackage {
-
-//     public: 
-
-//         SlowPackage();
-//         ~SlowPackage();
-//         // std::string serialize();
-//         // static SlowPackage deserialize(std::byte data, size_t size);
-//         std::string uuid;
-//         std::string ip;
-//         int port;
-//         uint32_t sttl;
-//         bool accepted_rejected;
-//         uint32_t seqnum;
-//         uint32_t acknum;
-//         PackageType type;
-//         bool revive;
-        
-// };
-
-// class Client {
-//     public:
-//         Client();
-         
-//         ~Client();
-//         void send_data(SlowPackage package);
-//         SlowPackage receive_data();
-// };
-
-// -------------------------
 
 enum class ConnectionStatus {OFFLINE, CONNECTED, EXPIRED, CONNECTING};
 class Transaction {
@@ -75,7 +42,8 @@ class Transaction {
         std::chrono::time_point<std::chrono::steady_clock> session_expiration;
 
         uint32_t current_seqnum; // package number
-        uint32_t cuirrent_sttl;
+        uint32_t current_sttl;
+        uint32_t last_acknum; // last ack received from server
 
         std::vector<SlowPackage> receiver_buffer; // keeps everything received from the server
         std::mutex buffer_mtx;
