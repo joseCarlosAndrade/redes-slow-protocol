@@ -5,7 +5,7 @@
 #include<string>
 
 #define N_RETRIES 10
-#define AWAIT_TIME_MS 10
+#define AWAIT_TIME_MS 100
 
 Transaction::Transaction(UdpClient *client) {
     if  (client == nullptr) {
@@ -31,17 +31,17 @@ bool Transaction::connection_still_alive() {
         return true;
     }
 
-    Log(LogLevel::WARNING, "SESSION EXPIRED");
+    Log(LogLevel::WARNING, "[transaction] SESSION EXPIRED");
 
     this->connection_status_mtx.lock();
-    this->connection_status = ConnectionStatus::EXPIRED;
+    // this->connection_status = ConnectionStatus::EXPIRED;
     this->connection_status_mtx.unlock();
 
     return false;
 }
 
 bool Transaction::connect() {
-    Log(LogLevel::INFO, "requesting connection");
+    Log(LogLevel::INFO, "[transaction] requesting connection");
 
     this->connection_status = ConnectionStatus::CONNECTING; 
     // spawns the listener thread
@@ -83,11 +83,11 @@ bool Transaction::connect() {
     }
 
     if (!sent) {
-        Log(LogLevel::ERROR, "error sending connect package. Cancelling");
+        Log(LogLevel::ERROR, "[transaction] error sending connect package. Cancelling");
         return false;
     }
 
-    Log(LogLevel::INFO, "connect package sent successfully");
+    Log(LogLevel::INFO, "[transaction] connect package sent successfully");
 
     // receive setup data (containing sesstion and stuff)
     SlowPackage setup_data;
@@ -107,18 +107,18 @@ bool Transaction::connect() {
     
     if (!found) {
         // error
-        Log(LogLevel::ERROR, "did not receive any setup msg from server");
+        Log(LogLevel::ERROR, "[transaction] did not receive any setup msg from server");
         return false;
     }
 
     // found a setup, but it may be rejected
 
     if (!setup_data.flag_accept_reject) {
-        Log(LogLevel::WARNING, "connection rejected by server");
+        Log(LogLevel::WARNING, "[transaction] connection rejected by server");
         return false;
     } 
 
-    Log(LogLevel::INFO, "received setup response from server. Connection accepted");
+    Log(LogLevel::INFO, "[transaction] received setup response from server. Connection accepted");
     // save session data
     this->session_uuid = setup_data.sid; // TODO: check on how it will be implemented
     this->current_seqnum = setup_data.seqnum;
@@ -144,10 +144,10 @@ bool Transaction::connect() {
 }
 
 bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
-    Log(LogLevel::INFO, "sending data: '" + data + "'. Attempts left: " + std::to_string(attempts_left));
+    Log(LogLevel::INFO, "[transaction] sending data: '" + data + "'. Attempts left: " + std::to_string(attempts_left));
 
     if (this->connection_status != ConnectionStatus::CONNECTED) {
-        Log(LogLevel::ERROR, "failed to send data: not connected.");
+        Log(LogLevel::ERROR, "[transaction] failed to send data: not connected.");
         return false;
     }
 
@@ -180,7 +180,7 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     }
 
     if (!sent) {
-        Log(LogLevel::ERROR, "could not send data package. Cancelling");
+        Log(LogLevel::ERROR, "[transaction] could not send data package. Cancelling");
         return false;
     }
 
@@ -198,7 +198,7 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
 
     if (!found) {
         if (attempts_left <= 0) {
-            Log(LogLevel::ERROR, "attempts exhausted. No ack received from server. Giving up");
+            Log(LogLevel::ERROR, "[transaction] attempts exhausted. No ack received from server. Giving up");
             return false;
         }
 
@@ -207,7 +207,7 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
         return this->send_data(data, revive, --attempts_left);
     }
 
-    Log(LogLevel::INFO, "ack received for data. Data successfully sent");
+    Log(LogLevel::INFO, "[transaction] ack received for data. Data successfully sent");
 
     // updating curernt seqnum accordingly
     this->current_seqnum = ack_data.seqnum;
@@ -218,7 +218,7 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
 }
 
 bool Transaction::disconnect() {
-    Log(LogLevel::INFO, "requesting disconnect");
+    Log(LogLevel::INFO, "[transaction] requesting disconnect");
 
     this->connection_status_mtx.lock();
     this->connection_status = ConnectionStatus::OFFLINE; // no matter if its successful or not, disconnect
@@ -254,11 +254,11 @@ bool Transaction::disconnect() {
     }
     
     if (!found) {
-        Log(LogLevel::ERROR, "did not receive any ack from server");
+        Log(LogLevel::ERROR, "[transaction] did not receive any ack from server");
         return false;
     }
 
-    Log(LogLevel::INFO, "ack received. Successfully disconnected");
+    Log(LogLevel::INFO, "[transaction] ack received. Successfully disconnected");
 
     return false;
 }
@@ -289,17 +289,17 @@ bool Transaction::check_buffer_for_data(SlowPackage::PackageType type, uint32_t 
 }
 
 void Transaction::listen_to_incoming_data() {
-    Log(LogLevel::INFO, "listening to incomming messages from server..");
+    Log(LogLevel::INFO, "[transaction] listening to incomming messages from server..");
 
     for (;;) {
         // this->connection_status_mtx.lock();
         if (this->connection_status != ConnectionStatus::CONNECTED && this->connection_status != ConnectionStatus::CONNECTING) {
             // this->connection_status_mtx.unlock();
-            Log(LogLevel::WARNING, "status is not connected. not listening to messages from server anymore.");
+            Log(LogLevel::WARNING, "[transaction] status is not connected. not listening to messages from server anymore.");
             
             int a = static_cast<int>(this->connection_status);
 
-            Log(LogLevel::WARNING, "status: " + std::to_string(a));
+            Log(LogLevel::WARNING, "[transaction] status: " + std::to_string(a));
 
             break;
         } // exists once the connection is over
@@ -308,7 +308,7 @@ void Transaction::listen_to_incoming_data() {
         // raw bytes
         auto data = this->client->receive_bytes();
 
-        Log(LogLevel::INFO, "received a package from server");
+        Log(LogLevel::INFO, "[transaction] received a package from server");
 
         // deserializing into SlowPackage
         auto package = SlowPackage::deserialize(data);

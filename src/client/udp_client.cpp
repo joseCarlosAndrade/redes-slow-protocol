@@ -5,6 +5,7 @@
 #include <netdb.h>
 #include <unistd.h> 
 #include <cstring>
+#include "logger.hpp"
 
 UdpClient::UdpClient(const std::string& host, int port)
     : host(host), port(port), sockfd(-1), is_connected(false) {
@@ -29,29 +30,20 @@ bool UdpClient::setupConnection() {
         return false;
     }
 
-    // Bind da socket para escutar resposta
-    if ((bind(sockfd, (struct sockaddr *)&listening_address, sizeof(listening_address)) < 0)) {
-        perror("Bind failed");
-        return false;
-    }
-
-    // 2. Resolver o nome do host
-    // struct hostent *server = gethostbyname(host.c_str());
-    // if (server == nullptr) {
-    //     std::cerr << "Erro: Host nao encontrado: " << host << std::endl;
-    //     return false;
-    // }
-
-    // 3. Preencher informações do servidor
+    // 2. Configurar o endereço do servidor
+    memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(port);
     if (inet_pton(AF_INET, host.c_str(), &servaddr.sin_addr) <= 0) {
-        perror("Invalid server address");
-        return false;
+        perror("inet_pton failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
     
-    is_connected = true;
-    std::cout << "Conexao UDP configurada para " << host << ":" << port << std::endl;
+    this->is_connected = true;
+
+    Log(LogLevel::INFO, "Conexao UDP configurada para " + host + ":" + std::to_string(port));
+    Log(LogLevel::INFO, "is_connected: " + std::to_string(is_connected));
     return true;
 }
 
