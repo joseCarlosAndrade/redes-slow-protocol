@@ -10,6 +10,10 @@ UdpClient::UdpClient(const std::string& host, int port)
     : host(host), port(port), sockfd(-1), is_connected(false) {
     // Inicializa a estrutura de endereço do servidor com zeros
     memset(&servaddr, 0, sizeof(servaddr));
+    memset(&listening_address, 0, sizeof(listening_address));
+    listening_address.sin_family = AF_INET;
+    listening_address.sin_addr.s_addr = INADDR_ANY;
+    listening_address.sin_port = htons(port);
 }
 
 UdpClient::~UdpClient() {
@@ -25,17 +29,26 @@ bool UdpClient::setupConnection() {
         return false;
     }
 
-    // 2. Resolver o nome do host
-    struct hostent *server = gethostbyname(host.c_str());
-    if (server == nullptr) {
-        std::cerr << "Erro: Host nao encontrado: " << host << std::endl;
+    // Bind da socket para escutar resposta
+    if ((bind(sockfd, (struct sockaddr *)&listening_address, sizeof(listening_address)) < 0)) {
+        perror("Bind failed");
         return false;
     }
 
+    // 2. Resolver o nome do host
+    // struct hostent *server = gethostbyname(host.c_str());
+    // if (server == nullptr) {
+    //     std::cerr << "Erro: Host nao encontrado: " << host << std::endl;
+    //     return false;
+    // }
+
     // 3. Preencher informações do servidor
     servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(port); 
-    memcpy(&servaddr.sin_addr, server->h_addr_list[0], server->h_length);
+    servaddr.sin_port = htons(port);
+    if (inet_pton(AF_INET, host.c_str(), &servaddr.sin_addr) <= 0) {
+        perror("Invalid server address");
+        return false;
+    }
     
     is_connected = true;
     std::cout << "Conexao UDP configurada para " << host << ":" << port << std::endl;

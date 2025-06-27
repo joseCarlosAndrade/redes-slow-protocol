@@ -42,22 +42,21 @@ std::vector<std::byte> SlowPackage::serialize() {
     // Session TTL (128 - 154)
     // flag bits (155 - 160), 
     std::vector<std::byte> ttlFlagBytes;
-    uint32_t sttlAndFlags = (sttl & 0x07FFFFFF); // 27 bits for sttl
-    sttlAndFlags <<= 5;
+    uint32_t sttlAndFlags = (sttl & 0x07FFFFFF) << 5; // 27 bits for sttl
     if (flag_connect) {
-        sttlAndFlags |= (1u << 0); // Set bit 27 for flag_connect
+        sttlAndFlags |= (1u << 4); // Set bit 27 for flag_connect
     }
     if (flag_revive) {
-        sttlAndFlags |= (1u << 1); // Set bit 28 for flag_revive
+        sttlAndFlags |= (1u << 3); // Set bit 28 for flag_revive
     }
     if (flag_ack) {
         sttlAndFlags |= (1u << 2); // Set bit 29 for flag_ack
     }
     if (flag_accept_reject) {
-        sttlAndFlags |= (1u << 3); // Set bit 30 for flag_accept_reject
+        sttlAndFlags |= (1u << 1); // Set bit 30 for flag_accept_reject
     }
     if (flag_mb) {
-        sttlAndFlags |= (1u << 4); // Set bit 31 for flag_mb
+        sttlAndFlags |= (1u << 0); // Set bit 31 for flag_mb
     }
     // Write as little endian (least significant byte first)
     for (int i = 0; i < 4; ++i) {
@@ -107,12 +106,12 @@ SlowPackage* SlowPackage::deserialize(std::vector<std::byte> data) {
     for (int i = 0; i < 4; ++i) {
         sttlAndFlags |= (static_cast<uint32_t>(data[16 + i]) << (8 * i));
     }
-    pkg->sttl = sttlAndFlags & 0x07FFFFFF; // Extract sttl (27 bits)
-    pkg->flag_connect = (sttlAndFlags & (1u << 27)) != 0;
-    pkg->flag_revive = (sttlAndFlags & (1u << 28)) != 0;
-    pkg->flag_ack = (sttlAndFlags & (1u << 29)) != 0;   
-    pkg->flag_accept_reject = (sttlAndFlags & (1u << 30)) != 0;
-    pkg->flag_mb = (sttlAndFlags & (1u << 31)) != 0;
+    pkg->flag_connect = (sttlAndFlags & (1u << 4)) != 0;
+    pkg->flag_revive = (sttlAndFlags & (1u << 3)) != 0;
+    pkg->flag_ack = (sttlAndFlags & (1u << 2)) != 0;
+    pkg->flag_accept_reject = (sttlAndFlags & (1u << 1)) != 0;
+    pkg->flag_mb = (sttlAndFlags & (1u << 0)) != 0;
+    pkg->sttl = (sttlAndFlags >> 5) & 0x07FFFFFF; // Extract sttl (27 bits)
     // seqnum (161 - 192)
     pkg->seqnum = 0;
     for (int i = 0; i < 4; ++i) {

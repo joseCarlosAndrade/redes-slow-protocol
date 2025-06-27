@@ -28,6 +28,7 @@ private:
     std::string host;
     int port;
     int sockfd;
+    struct sockaddr_in listening_address;
     struct sockaddr_in servaddr;
     bool is_connected;
 };
