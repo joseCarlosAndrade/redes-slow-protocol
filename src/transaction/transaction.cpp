@@ -147,7 +147,7 @@ bool Transaction::connect() {
 bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     Log(LogLevel::INFO, "[transaction] sending data: '" + data + "'. Attempts left: " + std::to_string(attempts_left));
 
-    if (this->connection_status != ConnectionStatus::CONNECTED) {
+    if (this->connection_status != ConnectionStatus::CONNECTED && !revive) {
         Log(LogLevel::ERROR, "[transaction] failed to send data: not connected.");
         return false;
     }
@@ -167,8 +167,23 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     package_data.window = 256;
 
 
-    if (revive) package_data.flag_revive = true;
+    if (revive)  {
+        if (!this->connection_still_alive()) {
+            Log(LogLevel::ERROR, "[transaction] connection expired. Cannot send data with revive flag");
+            return false;
+        }
 
+        package_data.flag_revive = true;
+
+        this->connection_status_mtx.lock();
+        this->connection_status = ConnectionStatus::CONNECTED; // setting status to connecting
+        this->connection_status_mtx.unlock();
+        
+        Log(LogLevel::INFO, "[transaction] connection still alive. Sending data with revive flag");
+        this->listener_thread.join(); // wait for the previous listener thread to finish
+        this->listener_thread = std::thread(&Transaction::listen_to_incoming_data, this);
+        Log(LogLevel::INFO, "[transaction] listener thread spawned for revive data");
+    }
     auto package_bytes = package_data.serialize();
     
     bool sent = false;
@@ -268,7 +283,7 @@ bool Transaction::disconnect() {
     this->connection_status = ConnectionStatus::OFFLINE; // no matter if its successful or not, disconnect
     this->connection_status_mtx.unlock();
 
-    return false;
+    return true;
 }
 
 bool Transaction::check_buffer_for_data(SlowPackage::PackageType type, uint32_t acknum, SlowPackage* package) {
@@ -301,20 +316,21 @@ void Transaction::listen_to_incoming_data() {
 
     for (;;) {
         // this->connection_status_mtx.lock();
-        if (this->connection_status != ConnectionStatus::CONNECTED && this->connection_status != ConnectionStatus::CONNECTING) {
+        if (this->connection_status != ConnectionStatus::CONNECTED 
+                && this->connection_status != ConnectionStatus::CONNECTING) {
             // this->connection_status_mtx.unlock();
-            Log(LogLevel::WARNING, "[transaction] status is not connected. not listening to messages from server anymore.");
+            Log(LogLevel::INFO, "[transaction] [LISTENER THREAD] status is not connected. not listening to messages from server anymore.");
             
-            int a = static_cast<int>(this->connection_status);
-
-            Log(LogLevel::WARNING, "[transaction] status: " + std::to_string(a));
-
             break;
         } // exists once the connection is over
         // this->connection_status_mtx.unlock(); 
 
         // raw bytes
         auto data = this->client->receive_bytes();
+
+        if (data.empty()) {
+            continue; // no data received, continue listening
+        }
 
         Log(LogLevel::INFO, "[transaction] received a package from server");
         
@@ -329,4 +345,6 @@ void Transaction::listen_to_incoming_data() {
         this->receiver_buffer.emplace_back(*package);
         this->buffer_mtx.unlock();
     }
+
+    Log(LogLevel::INFO, "[transaction] [LISTENER THREAD] listener thread finished");
 }

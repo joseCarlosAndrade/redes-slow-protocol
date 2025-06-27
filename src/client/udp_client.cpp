@@ -136,12 +136,13 @@ std::vector<std::byte> UdpClient::receive_bytes(int buffer_size) {
     socklen_t len = sizeof(servaddr);
 
     // recvfrom aguarda por dados
-    ssize_t bytes_received = recvfrom(sockfd, buffer.data(), buffer.size(), 0, 
+    ssize_t bytes_received = recvfrom(sockfd, buffer.data(), buffer.size(), MSG_DONTWAIT, 
                                       (struct sockaddr *)&servaddr, &len);
 
     if (bytes_received < 0) {
-        perror("Falha no recebimento de dados (ou timeout)");
-        return {};
+        // perror("Falha no recebimento de dados (ou timeout)");
+        buffer.resize(0); // Retorna um buffer vazio em caso de falha
+        return buffer;
     }
 
     // Redimensiona o buffer para o tamanho real de dados recebidos
