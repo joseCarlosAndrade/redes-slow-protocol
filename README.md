@@ -21,6 +21,8 @@ make all
 ./bin/app # starts the application
 ```
 
+Note: The first data ("Hello World") will pretty much all work. However, the second data (with revive) may not work sometimes due to the expiration time given by the sttl field from the server. Sometimes the time will expire before it trying to revive the connection depending on how long the code actually takes each time to run, which means the revive will fail. If you try a bunch of times, some of them will work.
+
 ## ⚙️ How It Works
 
 You can set whatever flow you want. However, a working example is in `main.go`, in which it connects, sends a message, disconnects, sends another message with revive (if the connection time is still on) and disconnects again.
