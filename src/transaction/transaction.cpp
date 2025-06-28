@@ -137,9 +137,6 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     }
 
     // for now, limit the data size to 1440 bytes (1472 - 32 bytes from header)
-    // TODO : implement fragmentation
-    // TODO : implement window
-
     int seqnum = this->current_seqnum;
 
     SlowPackage package_data; // to be implemented
@@ -159,7 +156,7 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
         package_data.flag_revive = true;
 
         this->connection_status_mtx.lock();
-        this->connection_status = ConnectionStatus::CONNECTED; // setting status to connecting
+        this->connection_status = ConnectionStatus::CONNECTING; // setting status to connecting
         this->connection_status_mtx.unlock();
         
         Log(LogLevel::INFO, "[transaction] connection still alive. Sending data with revive flag");
@@ -208,12 +205,26 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
 
     Log(LogLevel::INFO, "[transaction] ack received for data. Data successfully sent");
 
+    // Verifies if the revive request was accepted and sets connection status accordingly
+    if (revive) {
+        if (!ack_data.flag_accept_reject) {
+            Log(LogLevel::ERROR, "[transaction] server refused connection revive");
+            this->connection_status_mtx.lock();
+            this->connection_status = ConnectionStatus::OFFLINE; // setting status to connecting
+            this->connection_status_mtx.unlock();
+            return false;
+        }
+        this->connection_status_mtx.lock();
+        this->connection_status = ConnectionStatus::CONNECTED; // setting status to connecting
+        this->connection_status_mtx.unlock();
+    }
+
+    // If the revive is accepted
+
     // updating curernt seqnum accordingly
     this->current_seqnum = ack_data.seqnum;
     
     return true;
-
-    // (complicated stuff here to develop later)
 }
 
 bool Transaction::disconnect() {

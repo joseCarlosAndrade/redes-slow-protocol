@@ -104,10 +104,10 @@ The project follows a modular C++ architecture with clear separation of concerns
 redes-slow-protocol/
 ├── include/           # Global public headers (visible to all modules)
 ├── src/              # Private implementation files organized by module
-│   ├── main.cpp      # Application entry point
-│   ├── client/       # UDP client implementation
-│   ├── logger/       # Logging system
-│   ├── package_builder/  # Protocol package construction
+│   ├── main.cpp      # Contains a demo for the protocol library
+│   ├── client/       # UDP client implementation, isolates networking
+│   ├── logger/       # Logging system for easy debug and insight into the package
+│   ├── package_builder/  # Protocol packagedata type definition, serialization and deserialization
 │   └── transaction/  # Session and transaction management
 ├── bin/              # Compiled executable output
 ├── build/            # Object files and intermediate build artifacts
@@ -129,11 +129,9 @@ redes-slow-protocol/
 
 - **Purpose**: Implements the custom protocol packet structure
 - **Key Components**:
-  - Session ID (16-byte array)
-  - Sequence/acknowledgment numbers
-  - Protocol flags (connect, revive, ack, etc.)
-  - Package types: CONNECT, SETUP, DATA, ACK, DISCONNECT
-- **Features**: Serialization/deserialization, type classification
+  - `SlowPackage` DTO (Data Transfer Object) as a class
+  - Serialization and deserialization
+- **Features**: Serialization/deserialization, type definition
 
 **3. Package Builder Module** (`include/package_builder.hpp`, `src/package_builder/`)
 
@@ -143,6 +141,7 @@ redes-slow-protocol/
   - `disconnectPackage()`: Session termination
   - `fragmentedDataPackages()`: Data fragmentation for large payloads
   - `fragmentedRevivePackages()`: Session revival with existing session data
+- **Features**: Data fragmentation and easy package building without boilerplate
 
 **4. UDP Client Module** (`include/udp_client.hpp`, `src/client/`)
 
@@ -167,7 +166,7 @@ redes-slow-protocol/
 #### 🔄 **Data Flow Architecture**
 
 ```text
-main.cpp
+main.cpp (Your application)
     ↓ 
 Transaction Manager (session orchestration) -> Package Builder (protocol packet creation)
     ↓
