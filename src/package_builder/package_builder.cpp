@@ -5,7 +5,7 @@
 #include <cstddef>
 
 // Return a connect package, receives the window buffer remaining size
-SlowPackage conectPackage(uint16_t window) {
+SlowPackage connectPackage(uint16_t window) {
     auto pkg = new SlowPackage();
     pkg->type = SlowPackage::PackageType::CONNECT;
     pkg->sid.fill(std::byte(0)); // Initialize sid with zeros
@@ -62,7 +62,7 @@ std::vector<SlowPackage> fragmentedDataPackages(std::array<std::byte, 16> sid, u
             pkg->sttl = sttl; // Set session TTL
             pkg->flag_connect = false; // Set connect flag to false
             pkg->flag_revive = false; // Set revive flag to false
-            pkg->flag_ack = true; // Set ack flag to true
+            pkg->flag_ack = false; // Set ack flag to true
             pkg->flag_accept_reject = false; // Set accept/reject flag to false
             pkg->flag_mb = true; // Set mb flag to true
             pkg->seqnum = seqnum++; // Set sequence number
@@ -84,7 +84,7 @@ std::vector<SlowPackage> fragmentedDataPackages(std::array<std::byte, 16> sid, u
             pkg->sttl = sttl; // Set session TTL
             pkg->flag_connect = false; // Set connect flag to false
             pkg->flag_revive = false; // Set revive flag to false
-            pkg->flag_ack = true; // Set ack flag to true
+            pkg->flag_ack = false; // Set ack flag to true
             pkg->flag_accept_reject = false; // Set accept/reject flag to false
             pkg->flag_mb = false; // Set mb flag to true
             pkg->seqnum = seqnum++; // Set sequence number

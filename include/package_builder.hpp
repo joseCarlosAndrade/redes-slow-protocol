@@ -7,7 +7,7 @@
 #include"slow_package.hpp"
 #include <vector>
 
-SlowPackage conectPackage(uint16_t window);
+SlowPackage connectPackage(uint16_t window);
 
 // Return a disconnect package, requires session data
 SlowPackage disconnectPackage(std::array<std::byte, 16> sid, uint32_t sttl, uint32_t seqnum, uint32_t acknum);

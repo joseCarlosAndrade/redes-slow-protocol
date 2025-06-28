@@ -48,15 +48,8 @@ bool Transaction::connect() {
     // spawns the listener thread
     this->listener_thread = std::thread(&Transaction::listen_to_incoming_data, this);
 
-    SlowPackage connect_package;
-    connect_package.sid = {};
-    connect_package.sttl = 0;
-    connect_package.flag_connect = true;
-    connect_package.seqnum = 0;
-    connect_package.acknum = 0;
-    connect_package.window = 256;
-    connect_package.fid = 0;
-    connect_package.fo = 0;
+    // Builds connection package
+    auto connect_package = connectPackage(256);
 
     // serializing
     auto data_bytes = connect_package.serialize();
@@ -139,13 +132,15 @@ bool Transaction::send_data(std::string data, bool revive, int attempts_left) {
     // for now, limit the data size to 1440 bytes (1472 - 32 bytes from header)
     int seqnum = this->current_seqnum;
 
-    SlowPackage package_data; // to be implemented
-   
-    package_data.sid = this->session_uuid;
-    package_data.sttl = this->current_sttl;
-    package_data.flag_ack = false; // TODO: the specification requests for this flag to be set to 1, but it doenst work
-    package_data.seqnum = seqnum;
-    package_data.window = 256;
+    SlowPackage package_data;
+
+    // Package building
+    if (revive) {
+        package_data = fragmentedRevivePackages(session_uuid, current_sttl, seqnum, last_acknum, 256, 0,std::vector<std::byte>(reinterpret_cast<const std::byte*>(data.data()), reinterpret_cast<const std::byte*>(data.data()) + data.size()))[0];
+    }
+    else {
+        package_data = fragmentedDataPackages(session_uuid, current_sttl, seqnum, last_acknum, 256, 0,std::vector<std::byte>(reinterpret_cast<const std::byte*>(data.data()), reinterpret_cast<const std::byte*>(data.data()) + data.size()))[0];
+    }
 
     if (revive)  {
         if (!this->connection_still_alive()) {
