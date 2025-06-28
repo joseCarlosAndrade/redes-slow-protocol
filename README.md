@@ -21,7 +21,7 @@ make all
 ./bin/app # starts the application
 ```
 
-Note: The first data ("Hello World") will pretty much all work. However, the second data (with revive) may not work sometimes due to the expiration time given by the sttl field from the server. Sometimes the time will expire before it trying to revive the connection depending on how long the code actually takes each time to run, which means the revive will fail. If you try a bunch of times, some of them will work.
+Note: The first data ("Hello World") will pretty much work everytime. However, the second data (with revive) may not work sometimes due to the expiration time given by the sttl field from the server. Sometimes the time will expire before it tries to revive the connection depending on how long the code actually takes each time to run, which means the revive will fail. If you try a bunch of times, some of them will work.
 
 ## ⚙️ How It Works
 
